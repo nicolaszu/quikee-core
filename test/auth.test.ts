@@ -58,6 +58,30 @@ test('missing QUIKEE_ENV is treated as NOT deployed, but still needs a token wit
   );
 });
 
+test('ACCESS_AUD set but empty => misconfigured (not silently open)', async () => {
+  await assert.rejects(
+    authenticateRequest(req({ 'cf-access-jwt-assertion': 'x.y.z' }), {
+      QUIKEE_ENV: 'production',
+      ACCESS_TEAM_DOMAIN: 'nick.cloudflareaccess.com',
+      ACCESS_AUD: '  ,  ',
+    }),
+    (e: unknown) => e instanceof AuthError && e.reason === 'misconfigured',
+  );
+});
+
+test('multiple comma-separated AUDs are accepted as config (domain + preview app)', async () => {
+  // Still rejects the bogus token, but must fail on the TOKEN, not on parsing
+  // the two AUDs — proving the list form is understood.
+  await assert.rejects(
+    authenticateRequest(req({ 'cf-access-jwt-assertion': 'not.a.jwt' }), {
+      QUIKEE_ENV: 'production',
+      ACCESS_TEAM_DOMAIN: 'nick.cloudflareaccess.com',
+      ACCESS_AUD: 'aud-domain, aud-preview',
+    }),
+    (e: unknown) => e instanceof AuthError && e.reason === 'invalid-token',
+  );
+});
+
 test('deployed with a bogus token => invalid-token (never accepted)', async () => {
   await assert.rejects(
     authenticateRequest(req({ 'cf-access-jwt-assertion': 'not.a.jwt' }), {

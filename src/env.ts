@@ -2,11 +2,17 @@
  * Environment contract + runtime environment detection.
  *
  * The critical security property lives here: whether we are in a *deployed*
- * environment is decided by `QUIKEE_ENV`, a plaintext var baked into
- * `wrangler.jsonc` per environment and committed to the repo — NOT by the
- * presence or absence of a secret. That makes the dev-stub gate un-bypassable:
- * a leaked stub var in production cannot re-enable the stub, because the
- * committed `QUIKEE_ENV=production` marker overrides it.
+ * environment is decided by `QUIKEE_ENV`, a plaintext var committed to
+ * `wrangler.jsonc` — NOT by the presence or absence of a secret. That makes the
+ * dev-stub gate un-bypassable: a leaked stub var in production cannot re-enable
+ * the stub, because the committed `QUIKEE_ENV=production` marker overrides it.
+ *
+ * Each app is ONE Worker, so there is no production/preview split to encode here:
+ * committed config always says `production`, and local `wrangler dev` overrides it
+ * to `development` through `.dev.vars` — a gitignored file that cannot reach the
+ * cloud. So "this is a dev machine" is asserted only by something that never
+ * ships, and everything deployed (including branch preview versions, which are
+ * versions of the same Worker) is fail-closed by default.
  */
 
 export type QuikeeRuntimeEnv = 'development' | 'preview' | 'production';
@@ -17,15 +23,18 @@ export type QuikeeRuntimeEnv = 'development' | 'preview' | 'production';
  */
 export interface QuikeeAuthEnv {
   /**
-   * Set per-environment in wrangler.jsonc: "development" (top-level, used by
-   * `wrangler dev`), "preview", or "production". Missing is treated as
-   * "development" locally — but note only an explicit "development" (i.e. NOT
-   * deployed) allows the dev stub.
+   * "production" in committed wrangler.jsonc (covers the live domain AND branch
+   * preview versions — both are deployed), overridden to "development" by the
+   * local-only `.dev.vars`. Anything that is not explicitly a deployed value is
+   * treated as "development"; only that state permits the dev stub.
    */
   QUIKEE_ENV?: string;
   /** Full Access team domain, e.g. "nick.cloudflareaccess.com". Required when deployed with auth. */
   ACCESS_TEAM_DOMAIN?: string;
-  /** The Access application AUD tag this app validates tokens against. Required when deployed with auth. */
+  /**
+   * Access application AUD tag(s) this app accepts, comma-separated. Usually two:
+   * the custom-domain app and the preview-URL app. Required when deployed with auth.
+   */
   ACCESS_AUD?: string;
   /**
    * Local-only: when set (to an email), and ONLY in a non-deployed environment,

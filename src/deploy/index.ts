@@ -7,6 +7,5 @@ export {
   resolveDatabaseName,
   captureBookmark,
   applyMigrations,
-  type DeployEnv,
   type RunMigrationsOptions,
 } from './ritual.js';

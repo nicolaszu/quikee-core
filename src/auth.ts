@@ -103,6 +103,18 @@ export async function authenticateRequest(
     );
   }
 
+  // ACCESS_AUD may list several AUDs, comma-separated. One app can sit behind more
+  // than one Access application — the custom domain is one, and the Worker's
+  // preview URLs (which live on workers.dev and cannot use a custom domain) are a
+  // separate Access app with its own AUD. Accepting only one would 403 every
+  // preview. Each AUD is still verified against the same account JWKS.
+  const auds = env.ACCESS_AUD.split(',')
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (!auds.length) {
+    throw new AuthError('ACCESS_AUD is set but empty.', 'misconfigured');
+  }
+
   const token = readToken(request);
   if (!token) {
     throw new AuthError('No Cloudflare Access token on request.', 'no-token');
@@ -110,7 +122,7 @@ export async function authenticateRequest(
 
   try {
     const { payload } = await jwtVerify(token, getJwks(env.ACCESS_TEAM_DOMAIN), {
-      audience: env.ACCESS_AUD,
+      audience: auds,
       issuer: `https://${env.ACCESS_TEAM_DOMAIN}`,
     });
     const email = typeof payload.email === 'string' ? payload.email : undefined;
