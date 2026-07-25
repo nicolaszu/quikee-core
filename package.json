@@ -1,0 +1,47 @@
+{
+  "name": "@quikee/core",
+  "version": "0.1.0",
+  "description": "Invariant, security-critical plumbing shared by every quikee: fail-closed Access auth, req.user contract, D1/migration helpers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./deploy": {
+      "types": "./dist/deploy/index.d.ts",
+      "default": "./dist/deploy/index.js"
+    }
+  },
+  "bin": {
+    "quikee-migrate": "./dist/deploy/migrate.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.deploy.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.deploy.json --noEmit",
+    "test": "node --test 'test/*.test.ts'",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  },
+  "peerDependencies": {
+    "hono": ">=4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "@types/node": "^22.10.2",
+    "hono": "^4.6.14",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
