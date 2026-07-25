@@ -1,6 +1,6 @@
 {
   "name": "@quikee/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Invariant, security-critical plumbing shared by every quikee: fail-closed Access auth, req.user contract, D1/migration helpers.",
   "type": "module",
   "main": "./dist/index.js",

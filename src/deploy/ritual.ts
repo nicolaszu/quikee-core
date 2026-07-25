@@ -46,14 +46,19 @@ export function resolveDatabaseName(configPath: string, env: DeployEnv): string 
 export function captureBookmark(database: string, env: DeployEnv, cwd: string): string | null {
   try {
     const out = sh(['wrangler', 'd1', 'time-travel', 'info', database, '--env', env], cwd);
-    const match = out.match(/bookmark[^0-9a-zA-Z]*([0-9a-zA-Z-]+)/i);
-    const bookmark = match?.[1] ?? null;
+    // Wrangler prints: The current bookmark is '00000001-00000002-000050b3-9cf2…'
+    // Match the token shape itself — keying off the word "bookmark" alone would
+    // capture the following word ("is") instead of the value.
+    const match = out.match(/[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}/i);
+    const bookmark = match?.[0] ?? null;
     console.log(
       `\n[quikee] Pre-migration Time Travel bookmark for "${database}" (${env}): ${bookmark ?? 'unknown'}`,
     );
-    console.log(
-      `[quikee] To roll back: wrangler d1 time-travel restore ${database} --env ${env} --bookmark <bookmark>\n`,
-    );
+    if (bookmark) {
+      console.log(
+        `[quikee] To roll back: wrangler d1 time-travel restore ${database} --env ${env} --bookmark=${bookmark}\n`,
+      );
+    }
     return bookmark;
   } catch {
     console.warn(
