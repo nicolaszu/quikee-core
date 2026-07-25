@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { AuthError, authenticateRequest } from './auth.js';
-import type { QuikeeAuthEnv } from './env.js';
+import { isDeployed, type QuikeeAuthEnv } from './env.js';
 import type { QuikeeUser } from './user.js';
 
 /**
@@ -11,6 +11,24 @@ import type { QuikeeUser } from './user.js';
 export interface QuikeeHonoEnv<Bindings extends QuikeeAuthEnv = QuikeeAuthEnv> {
   Bindings: Bindings;
   Variables: { user: QuikeeUser };
+}
+
+/**
+ * Where to send someone whose session we refused, so they can get a working one.
+ *
+ * A rejected token is a dead end otherwise: Cloudflare's edge accepts the cookie
+ * (so the page loads), the Worker rejects the token (so the data does not), and
+ * the visitor has no way to log out and try again. That happens whenever a token
+ * outlives the config that validates it — most sharply after a team-domain
+ * rename, when old cookies still carry the previous `iss`.
+ *
+ * Clearing the Access session at the team domain is the fix; the next visit to
+ * the app triggers a fresh login. Returns null when auth is not configured (a
+ * public app, or local dev), where there is nothing to re-authenticate against.
+ */
+export function reauthUrl(env: QuikeeAuthEnv): string | null {
+  if (!isDeployed(env) || !env.ACCESS_TEAM_DOMAIN) return null;
+  return `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`;
 }
 
 /**
@@ -28,7 +46,10 @@ export function requireAuth<
       c.set('user', user);
     } catch (err) {
       if (err instanceof AuthError) {
-        return c.json({ error: 'unauthorized', reason: err.reason }, err.status);
+        return c.json(
+          { error: 'unauthorized', reason: err.reason, reauth: reauthUrl(c.env) },
+          err.status,
+        );
       }
       throw err;
     }
