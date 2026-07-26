@@ -26,15 +26,39 @@ export interface QuikeeHonoEnv<Bindings extends QuikeeAuthEnv = QuikeeAuthEnv> {
  * the app triggers a fresh login. Returns null when auth is not configured (a
  * public app, or local dev), where there is nothing to re-authenticate against.
  */
+/** Where `logout` must be mounted for `reauthUrl` to resolve. */
+export const LOGOUT_PATH = '/api/logout';
+
 export function reauthUrl(env: QuikeeAuthEnv, requestUrl: string): string | null {
   if (!isDeployed(env) || !env.ACCESS_TEAM_DOMAIN) return null;
-  // MUST be the app's own origin, not the team domain. Access issues two
-  // cookies: a global session token on the team domain, and an APPLICATION
-  // token on the app hostname. The application token is the one handed to this
-  // Worker and the one we reject, so the team-domain logout clears the wrong
-  // cookie and appears to do nothing. Same-origin also means the page can clear
-  // it with fetch() instead of navigating away.
-  return new URL('/cdn-cgi/access/logout', requestUrl).toString();
+  // Our own endpoint, deliberately — NOT Cloudflare's /cdn-cgi/access/logout,
+  // which was observed returning an error page with no Set-Cookie at all, so
+  // the cookie survived and "log out" silently did nothing.
+  return new URL(LOGOUT_PATH, requestUrl).toString();
+}
+
+/**
+ * Expire the Access application cookie on this host.
+ *
+ * Access stores the application token as `CF_Authorization` on the app's own
+ * hostname — the same hostname this Worker serves — so we can overwrite it with
+ * an expired cookie of the same name and path. HttpOnly stops *scripts* reading
+ * it, not the origin replacing it. After this the next request carries no token,
+ * so Access runs a fresh login and issues one that matches current config.
+ *
+ * Mount at LOGOUT_PATH: `app.post('/api/logout', logout)`.
+ */
+export function logout(): Response {
+  const clear = [
+    'CF_Authorization=',
+    'Path=/',
+    'Max-Age=0',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    'Secure',
+    'HttpOnly',
+    'SameSite=Lax',
+  ].join('; ');
+  return new Response(null, { status: 204, headers: { 'Set-Cookie': clear } });
 }
 
 /**
@@ -53,7 +77,7 @@ export function requireAuth<
     } catch (err) {
       if (err instanceof AuthError) {
         return c.json(
-          { error: 'unauthorized', reason: err.reason, reauth: reauthUrl(c.env, c.req.url) },
+          { error: 'unauthorized', reason: err.reason, detail: err.detail, reauth: reauthUrl(c.env, c.req.url) },
           err.status,
         );
       }

@@ -18,5 +18,5 @@ export type { QuikeeUser } from './user.js';
 export type { QuikeeAuthEnv, QuikeeRuntimeEnv } from './env.js';
 export { isDeployed, runtimeEnv } from './env.js';
 export { AuthError, authenticateRequest } from './auth.js';
-export { requireAuth, getUser, me, reauthUrl, type QuikeeHonoEnv } from './hono.js';
+export { requireAuth, getUser, me, reauthUrl, logout, LOGOUT_PATH, type QuikeeHonoEnv } from './hono.js';
 export { getD1, type D1Env } from './db.js';

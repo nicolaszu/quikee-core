@@ -19,6 +19,13 @@ export class AuthError extends Error {
       | 'invalid-token'
       | 'misconfigured'
       | 'stub-forbidden-in-production',
+    /**
+     * Which check failed, e.g. "ERR_JWT_CLAIM_VALIDATION_FAILED:iss". A bare
+     * "invalid-token" is nearly undebuggable in production — this says whether
+     * the issuer, audience, expiry or signature was the problem. It carries no
+     * token material, only the name of the failing claim.
+     */
+    readonly detail?: string,
   ) {
     super(message);
     this.name = 'AuthError';
@@ -140,6 +147,14 @@ export async function authenticateRequest(
     };
   } catch (err) {
     if (err instanceof AuthError) throw err;
-    throw new AuthError('Access token failed verification.', 'invalid-token');
+    // jose reports a `code` (and `claim` for claim failures). Surface it so a
+    // rejected token says WHICH check failed instead of just "invalid".
+    const e = err as { code?: string; claim?: string };
+    const detail = e.code ? (e.claim ? `${e.code}:${e.claim}` : e.code) : undefined;
+    throw new AuthError(
+      `Access token failed verification${detail ? ` (${detail})` : ''}.`,
+      'invalid-token',
+      detail,
+    );
   }
 }
