@@ -26,9 +26,15 @@ export interface QuikeeHonoEnv<Bindings extends QuikeeAuthEnv = QuikeeAuthEnv> {
  * the app triggers a fresh login. Returns null when auth is not configured (a
  * public app, or local dev), where there is nothing to re-authenticate against.
  */
-export function reauthUrl(env: QuikeeAuthEnv): string | null {
+export function reauthUrl(env: QuikeeAuthEnv, requestUrl: string): string | null {
   if (!isDeployed(env) || !env.ACCESS_TEAM_DOMAIN) return null;
-  return `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`;
+  // MUST be the app's own origin, not the team domain. Access issues two
+  // cookies: a global session token on the team domain, and an APPLICATION
+  // token on the app hostname. The application token is the one handed to this
+  // Worker and the one we reject, so the team-domain logout clears the wrong
+  // cookie and appears to do nothing. Same-origin also means the page can clear
+  // it with fetch() instead of navigating away.
+  return new URL('/cdn-cgi/access/logout', requestUrl).toString();
 }
 
 /**
@@ -47,7 +53,7 @@ export function requireAuth<
     } catch (err) {
       if (err instanceof AuthError) {
         return c.json(
-          { error: 'unauthorized', reason: err.reason, reauth: reauthUrl(c.env) },
+          { error: 'unauthorized', reason: err.reason, reauth: reauthUrl(c.env, c.req.url) },
           err.status,
         );
       }
